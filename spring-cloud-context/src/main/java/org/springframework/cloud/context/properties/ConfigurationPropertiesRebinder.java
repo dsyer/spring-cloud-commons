@@ -15,6 +15,7 @@
  */
 package org.springframework.cloud.context.properties;
 
+import java.io.Closeable;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -96,19 +97,22 @@ public class ConfigurationPropertiesRebinder
 				if (AopUtils.isAopProxy(bean)) {
 					bean = getTargetObject(bean);
 				}
-				// TODO: determine a more general approach to fix this.
-				// see https://github.com/spring-cloud/spring-cloud-commons/issues/318
-				if (bean.getClass().getName().equals("com.zaxxer.hikari.HikariDataSource")) {
-					return false; //ignore
+				if (bean instanceof Closeable) {
+						((Closeable) bean).close();
+				} else {
+					this.applicationContext.getAutowireCapableBeanFactory().destroyBean(bean);
 				}
-				this.applicationContext.getAutowireCapableBeanFactory().destroyBean(bean);
 				this.applicationContext.getAutowireCapableBeanFactory()
 						.initializeBean(bean, name);
 				return true;
 			}
 			catch (RuntimeException e) {
 				this.errors.put(name, e);
-				throw e;
+				throw  e;
+			} 
+			catch (Exception e) {
+				this.errors.put(name, e);
+				throw new IllegalStateException("Cannot rebind to " + name	, e);
 			}
 		}
 		return false;
